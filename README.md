@@ -1,5 +1,7 @@
 # Portfolio Optimization & Backtesting Framework
 
+Link to demo: https://github.com/nehirozs/MPT-Risk-Analysis/blob/main/notebooks/demo.ipynb 
+
 A production-ready Python framework implementing Modern Portfolio Theory (MPT) for systematic portfolio construction, backtesting, and risk analysis. Built for quantitative analysis with mathematical foundations and institutional-grade features.
 
 ## Overview
