@@ -1,6 +1,6 @@
 # Portfolio Optimization & Backtesting Framework
 
-A production-ready Python framework implementing Modern Portfolio Theory (MPT) for systematic portfolio construction, backtesting, and risk analysis. Built for quantitative analysis with rigorous mathematical foundations and institutional-grade features.
+A production-ready Python framework implementing Modern Portfolio Theory (MPT) for systematic portfolio construction, backtesting, and risk analysis. Built for quantitative analysis with mathematical foundations and institutional-grade features.
 
 ## Overview
 
