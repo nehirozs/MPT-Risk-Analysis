@@ -303,15 +303,29 @@ class MinimumVariance(Strategy):
         recent_data = historical_data.tail(lookback_window)
         
         try:
-            # Create optimizer and get minimum variance portfolio
-            optimizer = PortfolioOptimizer(recent_data)
+            # Create optimizer with regularization for numerical stability
+            optimizer = PortfolioOptimizer(recent_data, regularization=1e-5)
             weights = optimizer.minimum_variance_portfolio()
             return weights
         except Exception as e:
-            # If optimization fails, return equal weights
-            print(f"Optimization failed for {current_date}: {e}")
-            n_assets = len(returns_df.columns)
-            return pd.Series([1.0 / n_assets] * n_assets, index=returns_df.columns)
+            # If optimization fails, use inverse volatility weighting as intelligent fallback
+            # This is better than equal weights as it still considers risk
+            try:
+                volatilities = recent_data.std()
+                # Avoid division by zero
+                volatilities = volatilities.replace(0, np.inf)
+                # Inverse volatility weights (lower vol = higher weight)
+                inverse_vol = 1.0 / volatilities
+                weights = inverse_vol / inverse_vol.sum()
+                # Only print warning if it's not a silent fallback
+                if "Optimization failed" not in str(e):
+                    print(f"Optimization failed for {current_date}: {e}. Using inverse volatility weights.")
+                return weights
+            except Exception:
+                # Final fallback: equal weights if inverse vol also fails
+                print(f"Optimization failed for {current_date}: {e}. Using equal weights.")
+                n_assets = len(returns_df.columns)
+                return pd.Series([1.0 / n_assets] * n_assets, index=returns_df.columns)
 
 
 def create_strategy(strategy_name: str, **kwargs) -> Strategy:

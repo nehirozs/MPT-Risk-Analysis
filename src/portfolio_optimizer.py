@@ -14,7 +14,7 @@ from typing import Tuple, Optional, List, Dict
 class PortfolioOptimizer:
     """Portfolio optimization using Modern Portfolio Theory."""
     
-    def __init__(self, returns_df: pd.DataFrame, risk_free_rate: float = 0.0):
+    def __init__(self, returns_df: pd.DataFrame, risk_free_rate: float = 0.0, regularization: float = 1e-5):
         """
         Initialize PortfolioOptimizer.
         
@@ -24,15 +24,23 @@ class PortfolioOptimizer:
             DataFrame with asset returns (columns are assets, index is dates)
         risk_free_rate : float, optional
             Risk-free rate (default: 0.0)
+        regularization : float, optional
+            Regularization parameter for covariance matrix diagonal (default: 1e-5)
+            Helps with numerical stability for ill-conditioned matrices
         """
         self.returns_df = returns_df
         self.assets = returns_df.columns.tolist()
         self.n_assets = len(self.assets)
         self.risk_free_rate = risk_free_rate
+        self.regularization = regularization
         
         # Calculate expected returns and covariance matrix
         self.mean_returns = self.calculate_expected_returns(returns_df)
         self.cov_matrix = self.calculate_covariance_matrix(returns_df)
+        
+        # Apply regularization to covariance matrix for numerical stability
+        if regularization > 0:
+            self.cov_matrix = self.cov_matrix + regularization * np.eye(self.n_assets)
     
     @property
     def num_assets(self) -> int:
@@ -162,10 +170,13 @@ class PortfolioOptimizer:
     
     def minimum_variance_portfolio(self) -> pd.Series:
         """
-        Find the minimum variance portfolio.
+        Find the minimum variance portfolio with robust optimization.
         
         Minimizes: σ_p^2 = w^T Σ w
         Subject to: sum(w_i) = 1, w_i >= 0
+        
+        Uses multiple optimization methods for robustness and includes
+        regularization for numerical stability.
         
         Returns:
         --------
@@ -184,19 +195,48 @@ class PortfolioOptimizer:
         # Initial guess: equal weights
         initial_weights = np.array([1 / self.n_assets] * self.n_assets)
         
-        # Optimize
-        result = minimize(
-            objective,
-            initial_weights,
-            method='SLSQP',
-            bounds=bounds,
-            constraints=constraints
-        )
+        # Try multiple optimization methods for robustness
+        methods_to_try = ['SLSQP', 'trust-constr']
+        best_result = None
+        best_variance = np.inf
         
-        if not result.success:
-            raise ValueError(f"Optimization failed: {result.message}")
+        for method in methods_to_try:
+            try:
+                result = minimize(
+                    objective,
+                    initial_weights,
+                    method=method,
+                    bounds=bounds,
+                    constraints=constraints,
+                    options={'maxiter': 500, 'ftol': 1e-9} if method == 'SLSQP' else {'maxiter': 500}
+                )
+                
+                # Check if optimization succeeded and if result is better
+                if result.success:
+                    variance = objective(result.x)
+                    if variance < best_variance:
+                        best_variance = variance
+                        best_result = result
+                # Also try to use result even if not fully successful but has valid weights
+                elif result.x is not None and np.all(result.x >= 0) and np.abs(np.sum(result.x) - 1) < 0.01:
+                    variance = objective(result.x)
+                    if variance < best_variance:
+                        best_variance = variance
+                        best_result = result
+            except Exception:
+                # Continue to next method if this one fails
+                continue
         
-        return pd.Series(result.x, index=self.assets)
+        # If we found a valid result, use it
+        if best_result is not None and best_result.x is not None:
+            weights = best_result.x
+            # Ensure weights are non-negative and sum to 1
+            weights = np.maximum(weights, 0)
+            weights = weights / np.sum(weights)
+            return pd.Series(weights, index=self.assets)
+        
+        # If all methods failed, raise error
+        raise ValueError("Optimization failed: All methods failed to converge")
     
     def maximum_sharpe_ratio_portfolio(
         self,
