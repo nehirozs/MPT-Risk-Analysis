@@ -214,10 +214,6 @@ Where \(w_p, R_p\) are portfolio weights/returns and \(w_b, R_b\) are benchmark 
 - **Machine Learning**: LSTM/Transformer-based return prediction
 - **Alternative Data**: Sentiment analysis, satellite data integration
 
-## License
-
-[Add license information]
-
 ## Acknowledgments
 
 - Modern Portfolio Theory (Harry Markowitz, 1952)
